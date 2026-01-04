@@ -44,18 +44,6 @@ export default class DashWebPart extends BaseClientSideWebPart<IDashWebPartProps
     
     await super.onInit();
     SharePointSerivce.setup(this.context, Environment.type);
-    SharePointSerivce.getLists().then((lists)=>{
-      console.log(lists);
-      
-    }).catch((error)=>{
-      console.error("Error fetching lists: ", error);
-    });
-
-    SharePointSerivce.getListItems("54df84c3-1aeb-4ce4-9ba4-4f854bef6fda").then((items)=>{
-      console.log(items);
-    }).catch((error)=>{
-      console.error("Error fetching list items: ", error);
-    });
   }
 
 
