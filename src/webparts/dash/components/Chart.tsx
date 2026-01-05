@@ -8,28 +8,38 @@ import {
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement,    
+  LineElement,   
+  PointElement   
 } from 'chart.js';
 
-import { Bar } from 'react-chartjs-2';
+import { Bar, Doughnut, Line, Pie } from 'react-chartjs-2';
 ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement,
+  LineElement,
+  PointElement
 );
 
 export interface IChartProps {
-    chartTitle: string;
-
+      listId: string;
+  selectedFields: string[];
+  chartType: string;
+  chartTitle: string;
+  colors: string[];
 }
 export interface IChartState {
     items: IListItem[];
     loading: boolean;
     error: string | null;
-    isShowing:boolean;
+
+ //   isShowing:boolean;
 }
 
 export default class Chart extends React.Component<IChartProps, IChartState> {
@@ -38,14 +48,15 @@ export default class Chart extends React.Component<IChartProps, IChartState> {
 
         //bind methods
         this.getItems = this.getItems.bind(this);
-        this.hideItems = this.hideItems.bind(this);
+        //this.hideItems = this.hideItems.bind(this);
+        this.chartData = this.chartData.bind(this);
 
         //set initial state
         this.state = {
             items: [],
             loading: false,
             error: null,
-            isShowing:false,
+       //     isShowing:false,
         };
     }   
 
@@ -56,61 +67,88 @@ export default class Chart extends React.Component<IChartProps, IChartState> {
             <div>
                 <h1>{this.props.chartTitle}</h1>
                 {this.state.error && <p>Error: {this.state.error}</p>}
+                
+                {this.props.chartType === 'Bar' && <Bar data={this.chartData()} />}
+                {this.props.chartType === 'Line' && <Line data={this.chartData()} />}
+                {this.props.chartType === 'Pie' && <Pie data={this.chartData()} />}
+                {this.props.chartType === 'Doughnut' && <Doughnut data={this.chartData()} />}
 
-                <div>
-                    <Bar 
-                        data={{
-                            labels: ['January', 'February'],
-                            datasets: [
-                                {
-                                    label: 'Apples',
-                                    data: [10, 20, 30],
-                                    backgroundColor: 'rgba(255, 99, 132, 0.5)', // הוספתי צבע שיהיה ברור
-                                },
-                                {
-                                    label: 'Avocados',
-                                    data: [9, 12, 21],
-                                    backgroundColor: 'rgba(53, 162, 235, 0.5)',
-                                }]
-                        }} 
-                    />
-                </div>
 
-                <ul>
-                    {this.state.items.map((item)=>{
-                        return <li key={item.Id}>{item.Year}</li>;
-                    })}
-                </ul>
-
-                <button onClick={this.getItems} disabled={this.state.loading || this.state.isShowing}>{this.state.loading ? 'Loading...' : 'Get Projects'}</button>
-                <button onClick={this.hideItems} disabled={!this.state.isShowing}>Hide Projects</button>
+                <button onClick={this.getItems} disabled={this.state.loading}>{this.state.loading ? 'Loading...' : 'Refresh'}</button>
+               
             </div>
         );
     }
-
+// ביטול כפתור "הסתרת הפרויקים" מהרדנור
+//<button onClick={this.hideItems} disabled={!this.state.isShowing}>Hide Projects</button>
     public hideItems():void{
         this.setState({
-            isShowing:false,
+       //     isShowing:false,
             items:[],
         });
     }
     public getItems():void {
         this.setState({loading:true});
-        SharePointSerivce.getListItems("b6a36a73-a877-419e-9653-d2d8bf3a1aa0").then(
+        SharePointSerivce.getListItems(this.props.listId).then(
             (items)=>{
             this.setState({
                 items: items.value,
                 loading:false,
-                isShowing:true,
+          //      isShowing:true,
                 error:null,
             });
         }).catch((error)=>{
             this.setState({
                 error: error.message,
                 loading:false,
-                isShowing:false,
+            //    isShowing:false,
             });
         });
     }
+
+    public chartData(): any {
+    
+        const colors = [this.props.colors[0] || 'rgba(75, 192, 192, 0.6)',
+                        this.props.colors[1] || 'rgba(153, 102, 255, 0.6)',
+                        this.props.colors[2] || 'rgba(255, 159, 64, 0.6)']  ;
+        const data: { labels: string[], datasets: any[] } = {
+            labels: [],
+            datasets: [],
+        };
+
+        this.state.items.forEach((item,i) => {
+            const dataset = {
+                label:'',
+                data: [] as any[],
+                backgroundColor: colors[i % colors.length],
+                borderColor: colors[i % colors.length]
+            };
+
+            //Build dataset
+            this.props.selectedFields.forEach((field, index) => {
+                let value = item[field];
+                if(value === undefined && item[`OData_${field}`] !== undefined){
+                    value = item[`OData_${field}`];
+                }
+                // Add labels
+                if (i === 0 && index>0) {
+                    data.labels.push(field);
+                }
+
+                if(index===0){
+                    dataset.label = value;
+                }
+                else{
+                    dataset.data.push(value);
+                }
+            });
+        
+            data.datasets.push(dataset);
+        }); 
+        
+        return data;
+    }
+
+    
 }
 

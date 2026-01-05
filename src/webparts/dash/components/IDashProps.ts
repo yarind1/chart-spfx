@@ -1,7 +1,8 @@
 export interface IDashProps {
-  description: string;
-  isDarkTheme: boolean;
-  environmentMessage: string;
-  hasTeamsContext: boolean;
-  userDisplayName: string;
+  listId: string;
+  selectedFields: string[];
+  chartType: string;
+  chartTitle: string;
+  colors: string[];
+
 }

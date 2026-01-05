@@ -22,7 +22,13 @@
     "description": { "default": "Dash description" },
     "officeFabricIconFontName": "Page",
     "properties": {
-      "description": "Dash"
+      "listId": "",
+      "selectedFields": "",
+      "chartType": "Bar",
+      "chartTitle": "",
+      "color1": "ffce5680",
+      "color2": "ff638480",
+      "color3": "36a2eb80"
     }
   }]
 }
