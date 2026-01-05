@@ -3,6 +3,7 @@ import * as ReactDom from 'react-dom';
 import { Environment, Version } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
+  IPropertyPaneDropdownOption,
   PropertyPaneDropdown,
   PropertyPaneTextField
 } from '@microsoft/sp-property-pane';
@@ -16,11 +17,11 @@ import { IDashProps } from './components/IDashProps';
 import SharePointSerivce from '../../services/SharePoint/SharePointService';
 
 import { PropertyFieldColorPicker, PropertyFieldColorPickerStyle } from '@pnp/spfx-property-controls/lib/PropertyFieldColorPicker';
-
+import { PropertyFieldMultiSelect } from '@pnp/spfx-property-controls/lib/PropertyFieldMultiSelect';
 
 export interface IDashWebPartProps {
   listId: string;
-  selectedFields: string;
+  selectedFields: string[];
   chartType: string;
   chartTitle: string;
   color1: string;
@@ -29,16 +30,19 @@ export interface IDashWebPartProps {
 }
 
 export default class DashWebPart extends BaseClientSideWebPart<IDashWebPartProps> {
-
-
-
+  // List options state
+  private listOptions: IPropertyPaneDropdownOption[];
+  private listOptionsLoading: boolean = false;
+  //Field options state
+  private fieldOptions: IPropertyPaneDropdownOption[];
+  private fieldOptionsLoading: boolean = false;
 
   public render(): void {
     const element: React.ReactElement<IDashProps> = React.createElement(
       Dash,
       {
         listId: this.properties.listId,
-        selectedFields: this.properties.selectedFields.split(','),
+        selectedFields: this.properties.selectedFields,
         chartType: this.properties.chartType,
         chartTitle: this.properties.chartTitle,
         colors: [this.properties.color1, this.properties.color2, this.properties.color3]
@@ -48,8 +52,8 @@ export default class DashWebPart extends BaseClientSideWebPart<IDashWebPartProps
     ReactDom.render(element, this.domElement);
   }
 
-  public async onInit(): Promise<void> { 
-    
+  public async onInit(): Promise<void> {
+
     await super.onInit();
     SharePointSerivce.setup(this.context, Environment.type);
   }
@@ -74,11 +78,17 @@ export default class DashWebPart extends BaseClientSideWebPart<IDashWebPartProps
             {
               groupName: "Chart Data",
               groupFields: [
-                PropertyPaneTextField('listId', {
-                  label: 'List'
+                PropertyPaneDropdown('listId', {
+                  label: 'List',
+                  options: this.listOptions,
+                  disabled: this.listOptionsLoading,
                 }),
-                PropertyPaneTextField('selectedFields', {
-                  label: 'Selected Fields'
+                PropertyFieldMultiSelect('selectedFields', {
+                  key: 'selectedFields',
+                  label: "Slected Fields",
+                  options: this.fieldOptions,
+                  disabled: this.fieldOptionsLoading,
+                  selectedKeys: this.properties.selectedFields
                 }),
               ]
             },
@@ -87,7 +97,7 @@ export default class DashWebPart extends BaseClientSideWebPart<IDashWebPartProps
               groupFields: [
                 PropertyPaneDropdown('chartType', {
                   label: 'Chart Type',
-                  options:[
+                  options: [
                     { key: 'Bar', text: 'Bar' },
                     { key: 'Line', text: 'Line' },
                     { key: 'Pie', text: 'Pie' },
@@ -99,7 +109,7 @@ export default class DashWebPart extends BaseClientSideWebPart<IDashWebPartProps
                 }),
               ]
             },
-                        {
+            {
               groupName: "Chart Style",
               groupFields: [
                 PropertyFieldColorPicker('color1', {
@@ -149,5 +159,61 @@ export default class DashWebPart extends BaseClientSideWebPart<IDashWebPartProps
         }
       ]
     };
+  }
+  private async getLists(): Promise<IPropertyPaneDropdownOption[]> {
+    const lists = await SharePointSerivce.getLists();
+    return lists.value.map(list => ({
+      key: list.Id,
+      text: list.Title
+    }));
+  }
+  public async getFields(): Promise<IPropertyPaneDropdownOption[]> {
+    if (!this.properties.listId) {
+      return Promise.resolve([]);
+    }
+    const fields = await SharePointSerivce.getListFields(this.properties.listId);
+    return fields.value.map(field => ({
+      key: field.InternalName,
+      text: `${field.Title} (${field.TypeAsString})`
+    }));
+  }
+  protected async onPropertyPaneConfigurationStart(): Promise<void> {
+    try {
+      // מחכים שהרשימות יגיעו
+      const listOptions = await this.getLists();
+
+      // מעדכנים את המשתנה
+      this.listOptions = listOptions;
+
+      // מרעננים את הפאנל
+      this.context.propertyPane.refresh();
+      const fieldOptions = await this.getFields();
+      this.fieldOptions = fieldOptions;
+      this.context.propertyPane.refresh();
+
+
+    } catch (error) {
+      console.error('Error loading lists', error);
+    }
+  }
+  protected async onPropertyPaneFieldChanged(propertyPath: string, oldValue: any, newValue: any): Promise<void> {
+    super.onPropertyPaneFieldChanged(propertyPath, oldValue, newValue);
+
+    if (propertyPath === 'listId' && newValue) {
+      this.properties.selectedFields = [];
+      this.fieldOptionsLoading = true;
+      this.context.propertyPane.refresh();
+
+      try {
+        const fieldOptions = await this.getFields();
+        this.fieldOptions = fieldOptions;
+      } catch (error) {
+        console.error('Error loading fields', error);
+        this.fieldOptions = [];
+      } finally {
+        this.fieldOptionsLoading = false;
+        this.context.propertyPane.refresh();
+      }
+    }
   }
 }
